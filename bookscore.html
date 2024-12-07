@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评分金字塔图生成器</title>
+
+    <!-- 引入 Vega-Lite 和 Vega-Embed 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/vega@5.9.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.1.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.2.1"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 500px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-size: 14px;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        #binWidthValue {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #vis {
+            margin-top: 30px;
+            display: none; /* Initially hidden */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>评分金字塔图生成器</h1>
+
+    <!-- 输入评分 -->
+    <label for="scoreInput">请输入评分（用逗号分隔）：</label>
+    <textarea id="scoreInput" placeholder="例如：1.59, 2.00, 3.00, 4.00, ..." rows="4"></textarea>
+
+    <!-- 区间大小滑块 -->
+    <label for="binWidthSlider">选择区间大小（Bin Width）：</label>
+    <input type="range" id="binWidthSlider" min="0.1" max="1" step="0.1" value="0.2">
+    <span id="binWidthValue">0.2</span>
+
+    <!-- 生成按钮 -->
+    <button id="generateButton">生成评分金字塔图</button>
+
+    <!-- 图表 -->
+    <div id="vis"></div>
+</div>
+
+<script>
+    document.getElementById('binWidthSlider').addEventListener('input', function() {
+        document.getElementById('binWidthValue').textContent = this.value;
+    });
+
+    document.getElementById('generateButton').addEventListener('click', function() {
+        const inputText = document.getElementById('scoreInput').value;
+        const binWidth = parseFloat(document.getElementById('binWidthSlider').value);
+
+        // 解析输入的评分数据
+        const scores = inputText.split(',').map(score => parseFloat(score.trim())).filter(score => !isNaN(score));
+
+        if (scores.length === 0) {
+            alert("请输入有效的评分数据");
+            return;
+        }
+
+        // 计算评分的最小值和最大值
+        const minScore = Math.min(...scores);
+        const maxScore = Math.max(...scores);
+
+        // 计算区间
+        const bins = [];
+        for (let i = minScore; i <= maxScore; i += binWidth) {
+            bins.push(i);
+        }
+
+        // 统计每个区间的数量
+        const hist = Array(bins.length - 1).fill(0);
+        scores.forEach(score => {
+            for (let i = 0; i < bins.length - 1; i++) {
+                if (score >= bins[i] && score < bins[i + 1]) {
+                    hist[i]++;
+                    break;
+                }
+            }
+        });
+
+        // 使用 Vega-Lite 创建金字塔图
+        const yourViz = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "description": "评分金字塔图",
+            "data": {
+                "values": bins.slice(0, -1).map((bin, index) => ({
+                    "range": `${bin.toFixed(2)}-${(bins[index + 1] || "").toFixed(2)}`,
+                    "left": -hist[index],  // 左侧条形图的负值
+                    "right": hist[index]  // 右侧条形图的正值
+                }))
+            },
+            "mark": "bar",
+            "encoding": {
+                "y": {
+                    "field": "range",
+                    "type": "ordinal",
+                    "axis": { "title": "评分区间" }
+                },
+                "x": {
+                    "field": "left",
+                    "type": "quantitative",
+                    "axis": { "title": "数量", "grid": false }
+                },
+                "x2": {
+                    "field": "right"
+                },
+                "color": {
+                    "field": "range",
+                    "type": "nominal",
+                    "scale": { "range": ["#FFA500", "#FF8C00"] } // 统一橘色调
+                }
+            },
+            "config": {
+                "view": { "stroke": null },
+                "axis": { "grid": true }
+            }
+        };
+
+        // 嵌入Vega-Lite可视化
+        vegaEmbed('#vis', yourViz).then(function(result) {
+            document.getElementById('vis').style.display = 'block'; // 确保图表容器显示
+        }).catch(function(error) {
+            console.error(error);
+        });
+    });
+</script>
+
+</body>
+</html>
